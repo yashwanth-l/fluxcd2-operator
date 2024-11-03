@@ -1,0 +1,64 @@
+---
+apiVersion: fluxcd.controlplane.io/v1
+kind: FluxInstance
+metadata:
+  name: flux
+  namespace: flux-system
+  annotations:
+    fluxcd.controlplane.io/reconcile: "enabled"
+    fluxcd.controlplane.io/reconcileEvery: "24h"
+    fluxcd.controlplane.io/reconcileTimeout: "10m"
+spec:
+  distribution:
+    version: "2.4.x"
+    registry: "ghcr.io/fluxcd"
+    artifact: "oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests"
+  components:
+  - source-controller
+  - kustomize-controller
+  - helm-controller
+  - notification-controller
+  - image-automation-controller
+  - image-reflector-controller
+  cluster:
+    type: kubernetes
+    multitenant: false
+    networkPolicy: true
+    domain: "cluster.local"
+  sync:
+    kind: GitRepository
+    url: "https://github.com/yashwanth-l/fluxcd2-bootstrap"
+    ref: "refs/heads/main"
+    path: "clusters/flux-kind-k8s"
+    pullSecret: "github-app-token"
+  kustomize:
+    patches:
+    # Concurrent and requeue dependency
+    - patch: |
+        - op: add
+          path: /spec/template/spec/containers/0/args/-
+          value: --concurrent=10
+        - op: add
+          path: /spec/template/spec/containers/0/args/-
+          value: --requeue-dependency=5s
+      target:
+        kind: Deployment
+        name: "(kustomize-controller|helm-controller|source-controller)"
+    # Resource requests
+    - patch: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: all
+        spec:
+          template:
+            spec:
+              containers:
+                - name: manager
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+      target:
+        kind: Deployment
+        name: "(kustomize-controller|helm-controller|source-controller)"
