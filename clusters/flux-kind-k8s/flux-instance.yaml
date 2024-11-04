@@ -31,6 +31,10 @@ spec:
     ref: "refs/heads/main"
     path: "clusters/flux-kind-k8s"
     pullSecret: "github-app-token"
+  sharding:
+    shards:
+    - infra
+    - apps
   kustomize:
     patches:
     # Concurrent and requeue dependency
